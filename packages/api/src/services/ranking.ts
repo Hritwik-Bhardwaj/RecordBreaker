@@ -91,7 +91,19 @@ export async function refreshLeaderboardRanks(params: LeaderboardKey): Promise<v
   const { data: records, error: recError } = await query
   if (recError) throw new Error(`Failed to fetch records: ${recError.message}`)
 
-  const sorted = sortRecords((records as RawRecord[]) ?? [], variation.format_type)
+  // Keep only each user's best record
+  const bestPerUser = new Map<string, RawRecord>()
+  for (const record of (records as RawRecord[]) ?? []) {
+    const existing = bestPerUser.get(record.user_id)
+    if (!existing) {
+      bestPerUser.set(record.user_id, record)
+    } else {
+      const better = sortRecords([existing, record], variation.format_type)[0]
+      bestPerUser.set(record.user_id, better)
+    }
+  }
+
+  const sorted = sortRecords(Array.from(bestPerUser.values()), variation.format_type)
   const top200 = sorted.slice(0, 200)
 
   const rankRows = top200.map((record, index) => ({
